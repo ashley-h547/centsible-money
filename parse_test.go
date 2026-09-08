@@ -33,6 +33,12 @@ func TestParseAmount(t *testing.T) {
 		{name: "too many decimals", tok: "12.999", exp: 2, wantOff: 5, wantMsg: "too many decimal digits: this currency allows at most 2"},
 		{name: "any fraction too many for zero-decimal currency", tok: "12.34", exp: 0, wantOff: 3, wantMsg: "too many decimal digits: this currency allows at most 0"},
 		{name: "too large to represent", tok: "99999999999999999999.99", exp: 2, wantOff: 0, wantMsg: "amount is too large to represent"},
+
+		{name: "too many digits before first separator", tok: "1234,567.00", exp: 2, wantOff: 0, wantMsg: "too many digits before the first thousands separator"},
+		{name: "short group after separator", tok: "1,23,000.00", exp: 2, wantOff: 2, wantMsg: "expected 3 digits between thousands separators, got 2"},
+		{name: "short trailing group", tok: "1,234,56", exp: 0, wantOff: 6, wantMsg: "expected 3 digits after the last thousands separator, got 2"},
+		{name: "long trailing group", tok: "1,2345", exp: 0, wantOff: 2, wantMsg: "expected 3 digits after the last thousands separator, got 4"},
+		{name: "single digit group before separator is fine", tok: "1,000.00", exp: 2, wantUnits: 100000},
 	}
 
 	for _, tt := range tests {

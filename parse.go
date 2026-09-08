@@ -184,15 +184,26 @@ func parseAmount(tok string, exp int) (int64, *amountError) {
 
 	var whole strings.Builder
 	sawDigit := false
+	sawComma := false
+	group := 0 // digits seen since the start of the token or the last comma
 	for i < len(tok) && tok[i] != '.' {
 		switch c := tok[i]; {
 		case c >= '0' && c <= '9':
 			whole.WriteByte(c)
 			sawDigit = true
+			group++
 		case c == ',':
 			if !sawDigit {
 				return 0, &amountError{i, "unexpected ',' in amount"}
 			}
+			if !sawComma && group > 3 {
+				return 0, &amountError{i - group, "too many digits before the first thousands separator"}
+			}
+			if sawComma && group != 3 {
+				return 0, &amountError{i - group, fmt.Sprintf("expected 3 digits between thousands separators, got %d", group)}
+			}
+			sawComma = true
+			group = 0
 		default:
 			return 0, &amountError{i, fmt.Sprintf("unexpected character %q in amount", c)}
 		}
@@ -200,6 +211,9 @@ func parseAmount(tok string, exp int) (int64, *amountError) {
 	}
 	if whole.Len() == 0 {
 		return 0, &amountError{i, "expected at least one digit"}
+	}
+	if sawComma && group != 3 {
+		return 0, &amountError{i - group, fmt.Sprintf("expected 3 digits after the last thousands separator, got %d", group)}
 	}
 
 	fracDigits := ""
