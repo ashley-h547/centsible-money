@@ -5,6 +5,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -20,9 +21,20 @@ func main() {
 }
 
 func run(args []string) error {
+	fs := flag.NewFlagSet("money", flag.ContinueOnError)
+	precisionPath := fs.String("precision", "", "path to a currency precision table file, overriding the built-in one")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	precision, err := loadPrecision(*precisionPath)
+	if err != nil {
+		return err
+	}
+
 	var r io.Reader = os.Stdin
-	if len(args) > 0 {
-		f, err := os.Open(args[0])
+	if fs.NArg() > 0 {
+		f, err := os.Open(fs.Arg(0))
 		if err != nil {
 			return err
 		}
@@ -35,7 +47,7 @@ func run(args []string) error {
 		return fmt.Errorf("reading input: %w", err)
 	}
 
-	amounts, errs := money.Parse(string(data))
+	amounts, errs := money.ParseWithPrecision(string(data), precision)
 	if len(errs) > 0 {
 		for _, e := range errs {
 			fmt.Fprintln(os.Stderr, e.Annotated())
@@ -55,4 +67,24 @@ func run(args []string) error {
 		fmt.Println(money.Amount{Currency: code, Units: totals[code]})
 	}
 	return nil
+}
+
+// loadPrecision reads the currency precision table at path, or returns nil
+// (telling Parse to fall back to its built-in table) if path is empty.
+func loadPrecision(path string) (map[string]int, error) {
+	if path == "" {
+		return nil, nil
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("opening precision table: %w", err)
+	}
+	defer f.Close()
+
+	table, err := money.LoadPrecisionTable(f)
+	if err != nil {
+		return nil, fmt.Errorf("loading precision table: %w", err)
+	}
+	return table, nil
 }

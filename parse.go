@@ -64,7 +64,22 @@ func (es ParseErrors) Error() string {
 // stop at the first bad line: it returns every amount it could read
 // along with every error it found, so a caller can report all of them
 // at once instead of forcing the user through one-fix-at-a-time.
+//
+// Parse uses the built-in minorUnits table. Use ParseWithPrecision to
+// supply a different one, for example one loaded with LoadPrecisionTable.
 func Parse(src string) ([]Amount, ParseErrors) {
+	return ParseWithPrecision(src, nil)
+}
+
+// ParseWithPrecision behaves like Parse but looks up each currency code's
+// decimal precision in precision instead of the built-in table. Passing a
+// nil precision falls back to the built-in table, so ParseWithPrecision(src,
+// nil) and Parse(src) do exactly the same thing.
+func ParseWithPrecision(src string, precision map[string]int) ([]Amount, ParseErrors) {
+	if precision == nil {
+		precision = minorUnits
+	}
+
 	var amounts []Amount
 	var errs ParseErrors
 
@@ -77,7 +92,7 @@ func Parse(src string) ([]Amount, ParseErrors) {
 			continue
 		}
 
-		amt, err := parseLine(trimmed, lineNo)
+		amt, err := parseLine(trimmed, lineNo, precision)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -87,7 +102,7 @@ func Parse(src string) ([]Amount, ParseErrors) {
 	return amounts, errs
 }
 
-func parseLine(line string, lineNo int) (Amount, *ParseError) {
+func parseLine(line string, lineNo int, precision map[string]int) (Amount, *ParseError) {
 	i := 0
 	col := 1
 	skipSpace := func() {
@@ -112,7 +127,7 @@ func parseLine(line string, lineNo int) (Amount, *ParseError) {
 			Source:  line,
 		}
 	}
-	exp, known := minorUnits[code]
+	exp, known := precision[code]
 	if !known {
 		return Amount{}, &ParseError{
 			Pos:     Position{lineNo, codeStart},

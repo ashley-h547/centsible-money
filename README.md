@@ -28,6 +28,27 @@ USD/EUR/GBP, zero for JPY/KRW, three for KWD/BHD/OMR, and so on. That
 list lives in `amount.go` and currently covers the currencies I've
 actually needed.
 
+If you need a currency that isn't in that list, or want to override one,
+load your own table instead of patching the source. `LoadPrecisionTable`
+reads a `CODE DIGITS` per line file:
+
+```
+USD 2
+JPY 0
+XTS 4
+```
+
+and `ParseWithPrecision` takes the result in place of the built-in table:
+
+```go
+f, _ := os.Open("precision.txt")
+table, _ := money.LoadPrecisionTable(f)
+amounts, errs := money.ParseWithPrecision(doc, table)
+```
+
+A custom table replaces the built-in one entirely rather than merging
+with it, so include every currency your documents use.
+
 ## Library usage
 
 ```go
@@ -85,6 +106,16 @@ $ go run ./cmd/money amounts.txt
 ```
 
 It reads from a file argument, or from stdin if no argument is given.
+Pass `--precision <file>` to use a custom precision table loaded with
+`LoadPrecisionTable` instead of the built-in one:
+
+```
+$ go run ./cmd/money --precision precision.txt amounts.txt
+```
+
+Note that totals printed by the CLI are formatted using the built-in
+table regardless of `--precision`, so a currency that's only in your
+custom table prints as a bare integer instead of with a decimal point.
 
 ## Status
 
