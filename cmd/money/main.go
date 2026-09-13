@@ -64,7 +64,7 @@ func run(args []string) error {
 		totals[a.Currency] += a.Units
 	}
 	for _, code := range order {
-		fmt.Println(money.Amount{Currency: code, Units: totals[code]})
+		fmt.Println(money.FormatAmount(money.Amount{Currency: code, Units: totals[code]}, precision))
 	}
 	return nil
 }

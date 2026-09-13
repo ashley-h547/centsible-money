@@ -24,9 +24,24 @@ type Amount struct {
 }
 
 // String renders the amount with the correct number of decimal places
-// for its currency, e.g. "USD 19.99" or "JPY 1500".
+// for its currency, e.g. "USD 19.99" or "JPY 1500", using the built-in
+// minorUnits table. Callers that parsed with a custom precision table
+// (via ParseWithPrecision) should use FormatAmount instead, since a
+// currency known only to that table would otherwise print with the
+// wrong number of decimal places, or none at all.
 func (a Amount) String() string {
-	exp, ok := minorUnits[a.Currency]
+	return FormatAmount(a, minorUnits)
+}
+
+// FormatAmount renders a the same way String does, but looks up its
+// decimal precision in precision instead of the built-in minorUnits
+// table. A nil precision falls back to the built-in table.
+func FormatAmount(a Amount, precision map[string]int) string {
+	if precision == nil {
+		precision = minorUnits
+	}
+
+	exp, ok := precision[a.Currency]
 	if !ok || exp == 0 {
 		return fmt.Sprintf("%s %d", a.Currency, a.Units)
 	}
