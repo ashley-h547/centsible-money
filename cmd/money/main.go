@@ -5,24 +5,38 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	money "github.com/ashley-h547/centsible-money"
 )
 
 func main() {
-	if err := run(os.Args[1:]); err != nil {
+	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(args []string) error {
+// jsonTotal is the shape of one entry in --json output. Currency is
+// omitted under --sum-only, since the point of that flag is to drop
+// the currency label from the result entirely.
+type jsonTotal struct {
+	Currency  string `json:"currency,omitempty"`
+	Units     int64  `json:"units"`
+	Formatted string `json:"formatted"`
+}
+
+func run(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("money", flag.ContinueOnError)
+	fs.SetOutput(stderr)
 	precisionPath := fs.String("precision", "", "path to a currency precision table file, overriding the built-in one")
+	sumOnly := fs.Bool("sum-only", false, "print only the numeric total for each currency, without the currency code")
+	jsonOutput := fs.Bool("json", false, "print totals as a JSON array instead of plain text")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -50,7 +64,7 @@ func run(args []string) error {
 	amounts, errs := money.ParseWithPrecision(string(data), precision)
 	if len(errs) > 0 {
 		for _, e := range errs {
-			fmt.Fprintln(os.Stderr, e.Annotated())
+			fmt.Fprintln(stderr, e.Annotated())
 		}
 		return fmt.Errorf("%d error(s) found", len(errs))
 	}
@@ -63,8 +77,30 @@ func run(args []string) error {
 		}
 		totals[a.Currency] += a.Units
 	}
+
+	if *jsonOutput {
+		results := make([]jsonTotal, 0, len(order))
+		for _, code := range order {
+			formatted := money.FormatAmount(money.Amount{Currency: code, Units: totals[code]}, precision)
+			t := jsonTotal{Units: totals[code], Formatted: formatted}
+			if *sumOnly {
+				t.Formatted = strings.TrimPrefix(formatted, code+" ")
+			} else {
+				t.Currency = code
+			}
+			results = append(results, t)
+		}
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(results)
+	}
+
 	for _, code := range order {
-		fmt.Println(money.FormatAmount(money.Amount{Currency: code, Units: totals[code]}, precision))
+		formatted := money.FormatAmount(money.Amount{Currency: code, Units: totals[code]}, precision)
+		if *sumOnly {
+			formatted = strings.TrimPrefix(formatted, code+" ")
+		}
+		fmt.Fprintln(stdout, formatted)
 	}
 	return nil
 }

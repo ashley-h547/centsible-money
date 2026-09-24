@@ -113,9 +113,36 @@ Pass `--precision <file>` to use a custom precision table loaded with
 $ go run ./cmd/money --precision precision.txt amounts.txt
 ```
 
-Note that totals printed by the CLI are formatted using the built-in
-table regardless of `--precision`, so a currency that's only in your
-custom table prints as a bare integer instead of with a decimal point.
+Pass `--sum-only` to drop the currency code from each line, leaving
+just the number, which is handy when a script already knows the
+currency and wants a plain value to feed into something else:
+
+```
+$ go run ./cmd/money --sum-only amounts.txt
+45.50
+-5000.00
+1500
+```
+
+Pass `--json` to get the totals as a JSON array instead, one object per
+currency with its exact integer `units` alongside the same formatted
+string the plain-text output uses:
+
+```
+$ go run ./cmd/money --json amounts.txt
+[
+  {
+    "currency": "USD",
+    "units": 4550,
+    "formatted": "USD 45.50"
+  }
+]
+```
+
+`--sum-only` and `--json` combine: the `currency` field is dropped and
+`formatted` holds just the number, matching the plain-text behavior.
+Parse errors are always reported as plain text on stderr, with the
+`Annotated()` caret format, regardless of `--json`.
 
 ## Status
 
