@@ -1,6 +1,9 @@
 package money
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func TestAmountString(t *testing.T) {
 	tests := []struct {
@@ -35,6 +38,59 @@ func TestFormatAmountWithCustomPrecision(t *testing.T) {
 	u := Amount{Currency: "USD", Units: 19990}
 	if got, want := FormatAmount(u, override), "USD 19.990"; got != want {
 		t.Errorf("FormatAmount(%+v, override) = %q, want %q", u, got, want)
+	}
+}
+
+func TestAddSub(t *testing.T) {
+	a := Amount{"USD", 1999}
+	b := Amount{"USD", 1}
+
+	sum, err := a.Add(b)
+	if err != nil || sum != (Amount{"USD", 2000}) {
+		t.Errorf("Add = %+v, %v; want USD 2000, nil", sum, err)
+	}
+	diff, err := b.Sub(a)
+	if err != nil || diff != (Amount{"USD", -1998}) {
+		t.Errorf("Sub = %+v, %v; want USD -1998, nil", diff, err)
+	}
+}
+
+func TestAddSubCurrencyMismatch(t *testing.T) {
+	usd := Amount{"USD", 100}
+	eur := Amount{"EUR", 100}
+
+	if _, err := usd.Add(eur); err == nil {
+		t.Error("Add of USD and EUR succeeded, want error")
+	}
+	if _, err := usd.Sub(eur); err == nil {
+		t.Error("Sub of EUR from USD succeeded, want error")
+	}
+}
+
+func TestAddSubOverflow(t *testing.T) {
+	max := Amount{"USD", math.MaxInt64}
+	min := Amount{"USD", math.MinInt64}
+	one := Amount{"USD", 1}
+
+	if _, err := max.Add(one); err == nil {
+		t.Error("MaxInt64 + 1 succeeded, want overflow error")
+	}
+	if _, err := min.Add(Amount{"USD", -1}); err == nil {
+		t.Error("MinInt64 + -1 succeeded, want overflow error")
+	}
+	if _, err := min.Sub(one); err == nil {
+		t.Error("MinInt64 - 1 succeeded, want overflow error")
+	}
+	if _, err := max.Sub(Amount{"USD", -1}); err == nil {
+		t.Error("MaxInt64 - -1 succeeded, want overflow error")
+	}
+
+	// Boundary values that still fit must not be rejected.
+	if got, err := max.Add(Amount{"USD", -1}); err != nil || got.Units != math.MaxInt64-1 {
+		t.Errorf("MaxInt64 + -1 = %+v, %v", got, err)
+	}
+	if got, err := min.Add(max); err != nil || got.Units != -1 {
+		t.Errorf("MinInt64 + MaxInt64 = %+v, %v", got, err)
 	}
 }
 

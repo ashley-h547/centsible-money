@@ -2,7 +2,10 @@
 // exact integer values, because floats and money don't mix.
 package money
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // minorUnits maps an ISO 4217 currency code to how many digits follow
 // its decimal point. Most currencies use 2; yen-like currencies use 0
@@ -21,6 +24,32 @@ var minorUnits = map[string]int{
 type Amount struct {
 	Currency string
 	Units    int64
+}
+
+// Add returns a + b. It fails if the currencies differ, since adding
+// yen to dollars has no meaningful answer, or if the sum doesn't fit in
+// an int64, because a silently wrapped total is worse than an error.
+func (a Amount) Add(b Amount) (Amount, error) {
+	if a.Currency != b.Currency {
+		return Amount{}, fmt.Errorf("cannot add %s to %s: currencies differ", b.Currency, a.Currency)
+	}
+	if (b.Units > 0 && a.Units > math.MaxInt64-b.Units) ||
+		(b.Units < 0 && a.Units < math.MinInt64-b.Units) {
+		return Amount{}, fmt.Errorf("adding %s to %s overflows", b, a)
+	}
+	return Amount{Currency: a.Currency, Units: a.Units + b.Units}, nil
+}
+
+// Sub returns a - b, with the same currency and overflow checks as Add.
+func (a Amount) Sub(b Amount) (Amount, error) {
+	if a.Currency != b.Currency {
+		return Amount{}, fmt.Errorf("cannot subtract %s from %s: currencies differ", b.Currency, a.Currency)
+	}
+	if (b.Units < 0 && a.Units > math.MaxInt64+b.Units) ||
+		(b.Units > 0 && a.Units < math.MinInt64+b.Units) {
+		return Amount{}, fmt.Errorf("subtracting %s from %s overflows", b, a)
+	}
+	return Amount{Currency: a.Currency, Units: a.Units - b.Units}, nil
 }
 
 // String renders the amount with the correct number of decimal places

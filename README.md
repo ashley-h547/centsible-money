@@ -74,6 +74,13 @@ func main() {
 }
 ```
 
+`Amount` has `Add` and `Sub`. Both return an error if the currencies
+differ or the result would overflow an `int64`:
+
+```go
+total, err := a.Add(b)
+```
+
 An error looks like this:
 
 ```
